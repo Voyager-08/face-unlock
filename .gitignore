@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+data/credential.json
+data/face_template.json
+logs/
+cp/*.dll
+cp/*.exe
+cp/*.obj
+cp/*.lib
+cp/*.exp
+cp/*.pdb
+cp/*.ilk
+installer/stage/
+installer/output/
+installer/face.ico
+installer/make_icon.py
