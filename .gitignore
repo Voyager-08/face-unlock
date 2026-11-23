@@ -15,3 +15,4 @@ installer/stage/
 installer/output/
 installer/face.ico
 installer/make_icon.py
+data/settings.json

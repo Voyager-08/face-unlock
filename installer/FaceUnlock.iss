@@ -1,5 +1,5 @@
 #define AppName "Face Unlock"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppPublisher "Voyager-08"
 #define AppURL "https://github.com/Voyager-08/face-unlock"
 #define Stage GetEnv("FACEUNLOCK_STAGE")
@@ -25,7 +25,7 @@ OutputBaseFilename=FaceUnlockSetup-{#AppVersion}
 SetupIconFile={#Work}\face.ico
 UninstallDisplayIcon={app}\face.ico
 UninstallDisplayName={#AppName}
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion=1.1.0.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Installer
 Compression=lzma2/ultra64
@@ -75,4 +75,5 @@ begin
            '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
+
 
