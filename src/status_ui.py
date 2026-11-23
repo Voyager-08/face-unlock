@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 import tkinter as tk
+from tkinter import ttk
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / "logs" / "state.json"
@@ -19,6 +20,8 @@ CONFIG_PATH = ROOT / "data" / "credential.json"
 PIPE_NAME = r"\\.\pipe\faceunlock"
 ENROLL_SCRIPT = ROOT / "src" / "enroll.py"
 VENV_PYTHONW = ROOT / ".venv" / "Scripts" / "pythonw.exe"
+VENV_PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+SETTINGS_PATH = ROOT / "data" / "settings.json"
 
 BG = "#0b0e14"
 CARD = "#121722"
@@ -173,6 +176,20 @@ class Panel:
         self.lbl_autostart = self._row(info, "自启")
         self.lbl_autostart.configure(text="登录时自动启动", fg=GREEN, font=FONT_B)
 
+        cam = self._card("摄像头")
+        cam_row = tk.Frame(cam, bg=CARD)
+        cam_row.pack(fill="x", pady=(2, 4))
+        self.camera_var = tk.StringVar()
+        self.camera_box = ttk.Combobox(cam_row, textvariable=self.camera_var,
+                                       state="readonly", width=20)
+        self.camera_box.pack(side="left", fill="x", expand=True)
+        self._button(cam_row, "扫描", self.scan_cameras).pack(side="left", padx=(8, 0))
+        self._button(cam_row, "保存", self.save_camera).pack(side="left", padx=(6, 0))
+        self.camera_note = tk.Label(cam, text="", bg=CARD, fg=MUTED,
+                                    font=("Segoe UI", 9), anchor="w")
+        self.camera_note.pack(fill="x", pady=(4, 0))
+        self.camera_map = {}
+
         actions = self._card("快捷操作")
         action_row = tk.Frame(actions, bg=CARD)
         action_row.pack(fill="x", pady=(2, 4))
@@ -189,6 +206,89 @@ class Panel:
         self._button(buttons, "刷新", self.refresh).pack(side="left", expand=True, fill="x", padx=(0, 6))
         self._button(buttons, "释放内存", self.release).pack(side="left", expand=True, fill="x", padx=6)
         self._button(buttons, "关闭", self.root.destroy).pack(side="left", expand=True, fill="x", padx=(6, 0))
+        self._load_camera_settings()
+
+    def _load_camera_settings(self):
+        try:
+            settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            settings = {}
+        try:
+            idx = int(settings.get("camera_index", 0))
+        except Exception:
+            idx = 0
+        self.camera_map = {f"摄像头 {idx}": idx}
+        self.camera_box.configure(values=list(self.camera_map.keys()))
+        self.camera_var.set(f"摄像头 {idx}")
+        self.camera_note.configure(text=f"当前：摄像头 {idx}（点扫描可列出全部）", fg=MUTED)
+
+    def scan_cameras(self):
+        self.camera_note.configure(text="正在扫描摄像头…", fg=ACCENT)
+        self.send_cmd({"cmd": "unload"}, 4000)
+        code = (
+            "import cv2,json\n"
+            "found=[]\n"
+            "for i in range(6):\n"
+            "    cap=cv2.VideoCapture(i, cv2.CAP_DSHOW)\n"
+            "    if cap.isOpened():\n"
+            "        ok, fr = cap.read()\n"
+            "        if ok and fr is not None:\n"
+            "            found.append({'index': i, 'width': int(fr.shape[1]), 'height': int(fr.shape[0])})\n"
+            "    cap.release()\n"
+            "print(json.dumps(found))\n"
+        )
+
+        def work():
+            try:
+                out = subprocess.run(
+                    [str(VENV_PYTHON), "-c", code],
+                    capture_output=True, text=True, timeout=90,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                found = json.loads((out.stdout or "").strip() or "[]")
+            except Exception:
+                found = []
+            self.root.after(0, lambda: self._apply_scan(found))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_scan(self, found):
+        self.camera_map = {}
+        for item in found:
+            idx = item.get("index")
+            if idx is None:
+                continue
+            label = f"摄像头 {idx} ({item.get('width')}x{item.get('height')})"
+            self.camera_map[label] = idx
+        if not self.camera_map:
+            self.camera_note.configure(text="未找到可用摄像头", fg=RED)
+            return
+        self.camera_box.configure(values=list(self.camera_map.keys()))
+        try:
+            current = int(json.loads(SETTINGS_PATH.read_text(encoding="utf-8")).get("camera_index", 0))
+        except Exception:
+            current = 0
+        for label, idx in self.camera_map.items():
+            if idx == current:
+                self.camera_var.set(label)
+                break
+        else:
+            self.camera_var.set(next(iter(self.camera_map)))
+        self.camera_note.configure(text=f"找到 {len(self.camera_map)} 个摄像头", fg=GREEN)
+
+    def save_camera(self):
+        idx = self.camera_map.get(self.camera_var.get())
+        if idx is None:
+            self.camera_note.configure(text="请先扫描并选择摄像头", fg=RED)
+            return
+        try:
+            settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            settings = {}
+        settings["camera_index"] = idx
+        SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.send_cmd({"cmd": "unload"}, 4000)
+        self.camera_note.configure(text=f"已保存：摄像头 {idx}（识别与录入已切换）", fg=GREEN)
 
     def _button(self, parent, text, command) -> tk.Button:
         return tk.Button(parent, text=text, command=command, bg="#18202c", fg=TEXT,
@@ -232,7 +332,11 @@ class Panel:
 
         def work():
             try:
-                proc = subprocess.Popen([str(VENV_PYTHONW), str(ENROLL_SCRIPT)], cwd=str(ROOT / "src"))
+                camera = self.camera_map.get(self.camera_var.get())
+                args = [str(VENV_PYTHONW), str(ENROLL_SCRIPT)]
+                if camera is not None:
+                    args += ["--camera", str(camera)]
+                proc = subprocess.Popen(args, cwd=str(ROOT / "src"))
                 proc.wait()
                 self.send_cmd({"cmd": "unload"}, 5000)
                 if proc.returncode == 0:
@@ -360,7 +464,7 @@ def main() -> int:
     root = tk.Tk()
     root.title("人脸解锁 · 状态面板")
     root.configure(bg=BG)
-    root.geometry("480x936")
+    root.geometry("480x1044")
     root.resizable(False, False)
     root.lift()
     root.after(150, root.focus_force)

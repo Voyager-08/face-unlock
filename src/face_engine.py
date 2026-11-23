@@ -18,6 +18,26 @@ MODEL_PATH = ROOT / "models" / "face_landmarker.task"
 DATA_DIR = ROOT / "data"
 LOG_DIR = ROOT / "logs"
 TEMPLATE_PATH = DATA_DIR / "face_template.json"
+SETTINGS_PATH = DATA_DIR / "settings.json"
+
+
+def load_settings() -> dict:
+    try:
+        return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_settings(settings: dict) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def camera_index() -> int:
+    try:
+        return int(load_settings().get("camera_index", 0))
+    except Exception:
+        return 0
 
 FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
              397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
@@ -283,7 +303,9 @@ def draw_text_cn(bgr: np.ndarray, lines: list[str], origin: tuple[int, int] = (2
     return cv2.cvtColor(np.array(pil), cv2.COLOR_RGB2BGR)
 
 
-def open_camera(index: int = 0, width: int = 1280, height: int = 720) -> cv2.VideoCapture:
+def open_camera(index=None, width: int = 1280, height: int = 720) -> cv2.VideoCapture:
+    if index is None:
+        index = camera_index()
     cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
     if not cap.isOpened():
         cap = cv2.VideoCapture(index, cv2.CAP_MSMF)

@@ -37,7 +37,7 @@ REASON_CN = {
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="多姿态面部轮廓录入")
-    p.add_argument("--camera", type=int, default=0)
+    p.add_argument("--camera", type=int, default=None)
     p.add_argument("--countdown", type=float, default=5.0)
     p.add_argument("--capture", type=float, default=10.0)
     p.add_argument("--max-samples", type=int, default=160)

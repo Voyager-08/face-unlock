@@ -25,7 +25,7 @@ WINDOW = "人脸验证"
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="实时人脸轮廓验证")
-    p.add_argument("--camera", type=int, default=0)
+    p.add_argument("--camera", type=int, default=None)
     p.add_argument("--duration", type=float, default=12.0)
     p.add_argument("--template", type=Path, default=TEMPLATE_PATH)
     p.add_argument("--threshold", type=float, default=None)
