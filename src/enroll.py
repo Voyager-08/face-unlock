@@ -5,6 +5,14 @@ import sys
 import time
 from pathlib import Path
 
+_ROOT = Path(__file__).resolve().parents[1]
+_LOG_DIR = _ROOT / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+if sys.stdout is None:
+    sys.stdout = open(_LOG_DIR / "enroll.log", "a", encoding="utf-8", buffering=1)
+if sys.stderr is None:
+    sys.stderr = sys.stdout
+
 import cv2
 
 from face_engine import (
@@ -147,4 +155,11 @@ def main() -> int:
 if __name__ == "__main__":
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         sys.stdout.reconfigure(encoding="utf-8")
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise SystemExit(1)
