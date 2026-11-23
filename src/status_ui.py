@@ -163,7 +163,7 @@ class Panel:
 
         buttons = tk.Frame(self.root, bg=BG)
         buttons.pack(side="bottom", fill="x", padx=20, pady=(6, 14))
-        self._button(buttons, "刷新", self.refresh).pack(side="left", expand=True, fill="x", padx=(0, 6))
+        self._button(buttons, "启动服务", self.start_agent).pack(side="left", expand=True, fill="x", padx=(0, 6))
         self._button(buttons, "释放内存", self.release).pack(side="left", expand=True, fill="x", padx=6)
         self._button(buttons, "关闭", self.root.destroy).pack(side="left", expand=True, fill="x", padx=(6, 0))
 
@@ -428,6 +428,17 @@ class Panel:
     def lock_test(self):
         self.set_note("正在锁定屏幕，请正对摄像头进行真实测试…", ACCENT)
         self.root.after(400, lambda: ctypes.windll.user32.LockWorkStation())
+
+    def start_agent(self):
+        try:
+            subprocess.run(["schtasks.exe", "/run", "/tn", "FaceUnlockAgent"],
+                           capture_output=True,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                           timeout=10)
+            self.set_note("已请求启动后台服务，请稍候…", ACCENT)
+        except Exception as exc:
+            self.set_note(f"启动失败：{exc}", RED)
+        self.root.after(1500, self.refresh)
 
     def release(self):
         self.send_cmd({"cmd": "unload"}, 5000)

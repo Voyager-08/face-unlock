@@ -1,5 +1,5 @@
 #define AppName "Face Unlock"
-#define AppVersion "1.1.5"
+#define AppVersion "1.1.6"
 #define AppPublisher "Voyager-08"
 #define AppURL "https://github.com/Voyager-08/face-unlock"
 #define Stage GetEnv("FACEUNLOCK_STAGE")
@@ -25,7 +25,7 @@ OutputBaseFilename=FaceUnlockSetup-{#AppVersion}
 SetupIconFile={#Work}\face.ico
 UninstallDisplayIcon={app}\face.ico
 UninstallDisplayName={#AppName}
-VersionInfoVersion=1.1.5.0
+VersionInfoVersion=1.1.6.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Installer
 Compression=lzma2/ultra64
@@ -48,6 +48,8 @@ Name: "{app}\logs"
 
 [Icons]
 Name: "{group}\Face Unlock 状态面板"; Filename: "{app}\.venv\Scripts\pythonw.exe"; Parameters: """{app}\src\status_ui.py"""; WorkingDir: "{app}\src"; IconFilename: "{app}\face.ico"
+Name: "{group}\Face Unlock 启动"; Filename: "{app}\scripts\start_agent.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\face.ico"
+Name: "{userdesktop}\Face Unlock"; Filename: "{app}\scripts\start_agent.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\face.ico"
 Name: "{group}\卸载 Face Unlock"; Filename: "{uninstallexe}"
 
 [Run]
@@ -75,6 +77,7 @@ begin
            '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
+
 
 
 
