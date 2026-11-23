@@ -39,9 +39,9 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="多姿态面部轮廓录入")
     p.add_argument("--camera", type=int, default=None)
     p.add_argument("--countdown", type=float, default=5.0)
-    p.add_argument("--capture", type=float, default=10.0)
+    p.add_argument("--capture", type=float, default=14.0)
     p.add_argument("--max-samples", type=int, default=160)
-    p.add_argument("--min-samples", type=int, default=30)
+    p.add_argument("--min-samples", type=int, default=12)
     p.add_argument("--template", type=Path, default=TEMPLATE_PATH)
     return p.parse_args()
 
@@ -71,6 +71,8 @@ def main() -> int:
     descriptors = []
     last_obs = None
     preview = None
+    last_frame = None
+    reject_counts = {}
 
     start = time.time()
     capture_start = start + args.countdown
@@ -88,6 +90,7 @@ def main() -> int:
 
             obs = engine.observe(frame)
             last_obs = obs
+            last_frame = frame
             if now < capture_start:
                 main_text = "请坐好，正对摄像头"
                 sub = [f"{capture_start - now:4.1f} 秒后开始采集"]
@@ -99,8 +102,11 @@ def main() -> int:
                     descriptors.append(FaceEngine.descriptor(obs))
                     preview = frame.copy()
                 if obs is None:
+                    reject_counts["no_face"] = reject_counts.get("no_face", 0) + 1
                     sub.append("未检测到人脸")
                 elif not obs.ok:
+                    for reason in obs.reasons:
+                        reject_counts[reason] = reject_counts.get(reason, 0) + 1
                     sub.append("提示：" + "，".join(REASON_CN.get(r, r) for r in obs.reasons))
 
             annotated = draw_observation(frame, obs, [])
@@ -116,7 +122,12 @@ def main() -> int:
         cv2.destroyAllWindows()
 
     if len(descriptors) < args.min_samples:
+        if last_frame is not None:
+            cv2.imwrite(str(LOG_DIR / "enroll_last.jpg"), last_frame)
         print(f"错误：有效样本只有 {len(descriptors)} 帧（至少需要 {args.min_samples} 帧）。")
+        if reject_counts:
+            summary = ", ".join(f"{k}={v}" for k, v in sorted(reject_counts.items(), key=lambda x: -x[1]))
+            print(f"  拒帧统计：{summary}")
         return 4
 
     template = build_template(descriptors)

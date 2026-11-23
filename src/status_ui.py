@@ -386,13 +386,22 @@ class Panel:
                 args = [str(VENV_PYTHONW), str(ENROLL_SCRIPT)]
                 if camera is not None:
                     args += ["--camera", str(camera)]
+                self.send_cmd({"cmd": "unload"}, 4000)
+                time.sleep(0.8)
                 proc = subprocess.Popen(args, cwd=str(ROOT / "src"))
                 proc.wait()
                 self.send_cmd({"cmd": "unload"}, 5000)
                 if proc.returncode == 0:
-                    self.root.after(0, lambda: self.set_note("录入完成，新模板已生效", GREEN))
+                    msg, color = "录入完成，新模板已生效", GREEN
+                elif proc.returncode == 4:
+                    msg, color = "录入失败：有效帧不足，请正对摄像头、保持光线充足后重试", RED
+                elif proc.returncode == 2:
+                    msg, color = "录入失败：无法打开摄像头（可能被其他程序占用）", RED
+                elif proc.returncode == 3:
+                    msg, color = "录入已取消", YELLOW
                 else:
-                    self.root.after(0, lambda: self.set_note("录入已取消或失败", RED))
+                    msg, color = f"录入失败（代码 {proc.returncode}）", RED
+                self.root.after(0, lambda: self.set_note(msg, color))
             except Exception as exc:
                 self.root.after(0, lambda: self.set_note(f"录入启动失败：{exc}", RED))
 
