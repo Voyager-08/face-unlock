@@ -62,7 +62,7 @@ installer/ Inno Setup 脚本与构建脚本
 - Windows 10/11 x64
 - Visual Studio Build Tools + Windows SDK（编译 C++ 凭据提供程序）
 - Python 3.13（含 pip）
-- `pip install opencv-python mediapipe pywin32 pystray`
+- `pip install opencv-python mediapipe pywin32 pystray pygrabber`
 - Inno Setup 6（生成安装包）
 
 步骤：
@@ -70,7 +70,7 @@ installer/ Inno Setup 脚本与构建脚本
 1. 创建虚拟环境并安装依赖：
    ```powershell
    python -m venv .venv
-   .\.venv\Scripts\python.exe -m pip install opencv-python mediapipe pywin32 pystray
+   .\.venv\Scripts\python.exe -m pip install opencv-python mediapipe pywin32 pystray pygrabber
    ```
 2. 编译凭据提供程序：运行 `cp\build.bat`（生成 `cp\FaceUnlockCP.dll`）
 3. 生成安装包：
@@ -90,4 +90,5 @@ installer/ Inno Setup 脚本与构建脚本
 ## 许可
 
 本项目代码采用 MIT 许可。第三方组件见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 

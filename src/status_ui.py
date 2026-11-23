@@ -221,6 +221,7 @@ class Panel:
             side="left", expand=True, fill="x", padx=(0, 6))
         self._button(action_row, "测试识别", self.test_recognition).pack(
             side="left", expand=True, fill="x", padx=(6, 0))
+        self._button(actions, "测试锁屏", self.lock_test).pack(fill="x", pady=(0, 2))
         self.note = tk.Label(actions, text="就绪", bg=CARD, fg=MUTED,
                              font=("Segoe UI", 9), anchor="w")
         self.note.pack(fill="x", pady=(4, 0))
@@ -270,65 +271,61 @@ class Panel:
         except Exception:
             idx = 0
         self.camera_map = {f"摄像头 {idx}": idx}
+        name = settings.get("camera_name")
+        if name:
+            self.camera_map = {str(name): idx}
         self.camera_box.configure(values=list(self.camera_map.keys()))
-        self.camera_var.set(f"摄像头 {idx}")
-        self.camera_note.configure(text=f"当前：摄像头 {idx}（点扫描可列出全部）", fg=MUTED)
+        self.camera_var.set(next(iter(self.camera_map)))
+        self.camera_note.configure(text=f"当前：{self.camera_var.get()}（点扫描可列出全部）", fg=MUTED)
 
     def scan_cameras(self):
-        self.camera_note.configure(text="正在扫描摄像头…", fg=ACCENT)
-        self.send_cmd({"cmd": "unload"}, 4000)
+        self.camera_note.configure(text="正在枚举摄像头设备…", fg=ACCENT)
         code = (
-            "import cv2,json\n"
-            "found=[]\n"
-            "for i in range(6):\n"
-            "    cap=cv2.VideoCapture(i, cv2.CAP_DSHOW)\n"
-            "    if cap.isOpened():\n"
-            "        ok, fr = cap.read()\n"
-            "        if ok and fr is not None:\n"
-            "            found.append({'index': i, 'width': int(fr.shape[1]), 'height': int(fr.shape[0])})\n"
-            "    cap.release()\n"
-            "print(json.dumps(found))\n"
+            "import json\n"
+            "from pygrabber.dshow_graph import FilterGraph\n"
+            "print(json.dumps(FilterGraph().get_input_devices()))\n"
         )
 
         def work():
             try:
                 out = subprocess.run(
                     [str(VENV_PYTHON), "-c", code],
-                    capture_output=True, text=True, timeout=90,
+                    capture_output=True, text=True, timeout=40,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-                found = json.loads((out.stdout or "").strip() or "[]")
+                names = json.loads((out.stdout or "").strip() or "[]")
+                if not isinstance(names, list):
+                    names = []
             except Exception:
-                found = []
-            self.root.after(0, lambda: self._apply_scan(found))
+                names = []
+            self.root.after(0, lambda: self._apply_scan(names))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _apply_scan(self, found):
+    def _apply_scan(self, names):
         self.camera_map = {}
-        for item in found:
-            idx = item.get("index")
-            if idx is None:
-                continue
-            label = f"摄像头 {idx} ({item.get('width')}x{item.get('height')})"
-            self.camera_map[label] = idx
+        for idx, name in enumerate(names):
+            self.camera_map[f"{idx} · {name}"] = idx
         if not self.camera_map:
-            self.camera_note.configure(text="未找到可用摄像头", fg=RED)
+            self.camera_note.configure(text="未找到摄像头（请确认已安装 pygrabber）", fg=RED)
             return
         self.camera_box.configure(values=list(self.camera_map.keys()))
         try:
-            current = int(json.loads(SETTINGS_PATH.read_text(encoding="utf-8")).get("camera_index", 0))
+            settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
         except Exception:
-            current = 0
+            settings = {}
+        current = int(settings.get("camera_index", 0) or 0)
+        current_name = settings.get("camera_name")
         for label, idx in self.camera_map.items():
             if idx == current:
                 self.camera_var.set(label)
                 break
         else:
             self.camera_var.set(next(iter(self.camera_map)))
-        self.camera_note.configure(text=f"找到 {len(self.camera_map)} 个摄像头", fg=GREEN)
+        self.camera_note.configure(text=f"找到 {len(self.camera_map)} 个摄像头设备", fg=GREEN)
 
     def save_camera(self):
-        idx = self.camera_map.get(self.camera_var.get())
+        label = self.camera_var.get()
+        idx = self.camera_map.get(label)
         if idx is None:
             self.camera_note.configure(text="请先扫描并选择摄像头", fg=RED)
             return
@@ -337,10 +334,11 @@ class Panel:
         except Exception:
             settings = {}
         settings["camera_index"] = idx
+        settings["camera_name"] = label
         SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
         SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
         self.send_cmd({"cmd": "unload"}, 4000)
-        self.camera_note.configure(text=f"已保存：摄像头 {idx}（识别与录入已切换）", fg=GREEN)
+        self.camera_note.configure(text=f"已保存：{label}（识别与录入已切换）", fg=GREEN)
 
     def _button(self, parent, text, command) -> tk.Button:
         return tk.Button(parent, text=text, command=command, bg="#18202c", fg=TEXT,
@@ -417,6 +415,10 @@ class Panel:
             self.root.after(0, lambda: self.set_note(msg, color))
 
         threading.Thread(target=work, daemon=True).start()
+
+    def lock_test(self):
+        self.set_note("正在锁定屏幕，请正对摄像头进行真实测试…", ACCENT)
+        self.root.after(400, lambda: ctypes.windll.user32.LockWorkStation())
 
     def release(self):
         self.send_cmd({"cmd": "unload"}, 5000)

@@ -63,6 +63,10 @@ def main() -> int:
         print("错误：无法打开摄像头")
         return 2
 
+    cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINDOW, 960, 540)
+    cv2.moveWindow(WINDOW, 60, 60)
+
     engine = FaceEngine()
     descriptors = []
     last_obs = None
