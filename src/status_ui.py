@@ -91,6 +91,15 @@ def read_json(path: Path):
         return {}
 
 
+def tail_lines(path: Path, count: int = 2) -> str:
+    try:
+        data = path.read_bytes()[-2048:]
+        lines = data.decode("utf-8", "ignore").splitlines()
+        return "\n".join(lines[-count:])
+    except Exception:
+        return ""
+
+
 def mask_account(user: str, domain: str) -> str:
     if not user:
         return "—"
@@ -120,9 +129,9 @@ class Panel:
         self._build()
         self.refresh()
 
-    def _card(self, title: str) -> tk.Frame:
-        frame = tk.Frame(self.root, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
-        frame.pack(fill="x", padx=18, pady=(0, 10))
+    def _card(self, title: str, parent) -> tk.Frame:
+        frame = tk.Frame(parent, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=4, pady=(0, 8))
         tk.Label(frame, text=title, bg=CARD, fg=MUTED, font=("Segoe UI", 9)).pack(
             anchor="w", padx=14, pady=(9, 2))
         body = tk.Frame(frame, bg=CARD)
@@ -131,7 +140,7 @@ class Panel:
 
     def _row(self, body: tk.Frame, label: str) -> tk.Label:
         row = tk.Frame(body, bg=CARD)
-        row.pack(fill="x", pady=2)
+        row.pack(fill="x", pady=3)
         tk.Label(row, text=label, bg=CARD, fg=MUTED, font=FONT, anchor="w", width=10).pack(side="left")
         value = tk.Label(row, text="—", bg=CARD, fg=TEXT, font=MONO, anchor="e")
         value.pack(side="right")
@@ -139,49 +148,61 @@ class Panel:
 
     def _build(self):
         header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=18, pady=(16, 2))
+        header.pack(fill="x", padx=20, pady=(16, 2))
         tk.Label(header, text="人脸解锁", bg=BG, fg=TEXT,
-                 font=("Segoe UI Semibold", 19)).pack(side="left")
+                 font=("Segoe UI Semibold", 20)).pack(side="left")
         status_frame = tk.Frame(header, bg=BG)
-        status_frame.pack(side="right", pady=6)
+        status_frame.pack(side="right", pady=4)
         self.dot = tk.Canvas(status_frame, width=12, height=12, bg=BG, highlightthickness=0)
         self.dot.pack(side="left", padx=(0, 7))
         self.status_text = tk.Label(status_frame, text="运行中", bg=BG, fg=GREEN, font=FONT_B)
         self.status_text.pack(side="left")
 
         tk.Label(self.root, text="Face Unlock Console", bg=BG, fg=MUTED,
-                 font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(0, 14))
+                 font=("Segoe UI", 9)).pack(anchor="w", padx=22, pady=(0, 8))
 
-        proc = self._card("进程状态")
+        buttons = tk.Frame(self.root, bg=BG)
+        buttons.pack(side="bottom", fill="x", padx=20, pady=(6, 14))
+        self._button(buttons, "刷新", self.refresh).pack(side="left", expand=True, fill="x", padx=(0, 6))
+        self._button(buttons, "释放内存", self.release).pack(side="left", expand=True, fill="x", padx=6)
+        self._button(buttons, "关闭", self.root.destroy).pack(side="left", expand=True, fill="x", padx=(6, 0))
+
+        body = tk.Frame(self.root, bg=BG)
+        body.pack(fill="both", expand=True, padx=14, pady=(0, 4))
+        left = tk.Frame(body, bg=BG)
+        left.pack(side="left", fill="both", expand=True, padx=5)
+        mid = tk.Frame(body, bg=BG)
+        mid.pack(side="left", fill="both", expand=True, padx=5)
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=5)
+
+        proc = self._card("进程状态", left)
         self.lbl_agent_pid = self._row(proc, "常驻进程")
         self.lbl_agent_mem = self._row(proc, "常驻内存")
         self.lbl_worker_pid = self._row(proc, "识别进程")
         self.lbl_worker_mem = self._row(proc, "识别内存")
         self.lbl_total = self._row(proc, "合计占用")
+        self.lbl_uptime = self._row(proc, "运行时长")
         self.bar = tk.Canvas(proc, height=8, bg=BG, highlightthickness=0)
         self.bar.pack(fill="x", pady=(8, 2))
 
-        tpl = self._card("识别参数")
+        tpl = self._card("识别参数", left)
         self.lbl_threshold = self._row(tpl, "匹配阈值")
         self.lbl_poses = self._row(tpl, "姿态模板")
         self.lbl_enrolled = self._row(tpl, "录入时间")
+        self.lbl_method = self._row(tpl, "匹配方式")
+        self.lbl_method.configure(text="EDM 轮廓")
+        self.lbl_smooth = self._row(tpl, "平滑窗口")
+        self.lbl_smooth.configure(text="7 帧")
+        self.lbl_need = self._row(tpl, "连续匹配")
+        self.lbl_need.configure(text="6 帧")
 
-        last = self._card("最近识别")
-        self.lbl_result = self._row(last, "结果")
-        self.lbl_dist = self._row(last, "距离")
-        self.lbl_last_time = self._row(last, "时间")
-
-        info = self._card("账户与自启")
-        self.lbl_account = self._row(info, "账户")
-        self.lbl_autostart = self._row(info, "自启")
-        self.lbl_autostart.configure(text="登录时自动启动", fg=GREEN, font=FONT_B)
-
-        cam = self._card("摄像头")
+        cam = self._card("摄像头", mid)
         cam_row = tk.Frame(cam, bg=CARD)
         cam_row.pack(fill="x", pady=(2, 4))
         self.camera_var = tk.StringVar()
         self.camera_box = ttk.Combobox(cam_row, textvariable=self.camera_var,
-                                       state="readonly", width=20)
+                                       state="readonly", width=18)
         self.camera_box.pack(side="left", fill="x", expand=True)
         self._button(cam_row, "扫描", self.scan_cameras).pack(side="left", padx=(8, 0))
         self._button(cam_row, "保存", self.save_camera).pack(side="left", padx=(6, 0))
@@ -189,8 +210,11 @@ class Panel:
                                     font=("Segoe UI", 9), anchor="w")
         self.camera_note.pack(fill="x", pady=(4, 0))
         self.camera_map = {}
+        tk.Label(cam, text="选择本机摄像头后点“保存”，识别、录入、测试都会使用它。",
+                 bg=CARD, fg=MUTED, font=("Segoe UI", 9), anchor="w",
+                 justify="left", wraplength=300).pack(fill="x", pady=(6, 0))
 
-        actions = self._card("快捷操作")
+        actions = self._card("快捷操作", mid)
         action_row = tk.Frame(actions, bg=CARD)
         action_row.pack(fill="x", pady=(2, 4))
         self._button(action_row, "录入人脸", self.enroll).pack(
@@ -200,12 +224,40 @@ class Panel:
         self.note = tk.Label(actions, text="就绪", bg=CARD, fg=MUTED,
                              font=("Segoe UI", 9), anchor="w")
         self.note.pack(fill="x", pady=(4, 0))
+        tk.Label(actions, text="提示：录入会打开摄像头，按屏幕提示转头；切换后识别进程会自动重启。",
+                 bg=CARD, fg=MUTED, font=("Segoe UI", 9), anchor="w",
+                 justify="left", wraplength=300).pack(fill="x", pady=(6, 0))
 
-        buttons = tk.Frame(self.root, bg=BG)
-        buttons.pack(fill="x", padx=18, pady=(4, 16))
-        self._button(buttons, "刷新", self.refresh).pack(side="left", expand=True, fill="x", padx=(0, 6))
-        self._button(buttons, "释放内存", self.release).pack(side="left", expand=True, fill="x", padx=6)
-        self._button(buttons, "关闭", self.root.destroy).pack(side="left", expand=True, fill="x", padx=(6, 0))
+        log_card = self._card("最近日志", mid)
+        self.log_label = tk.Label(log_card, text="—", bg=CARD, fg=MUTED,
+                                  font=("Consolas", 8), anchor="nw", justify="left",
+                                  wraplength=320)
+        self.log_label.pack(fill="both", expand=True)
+
+        last = self._card("最近识别", right)
+        self.lbl_result = self._row(last, "结果")
+        self.lbl_dist = self._row(last, "距离")
+        self.lbl_last_time = self._row(last, "时间")
+        self.lbl_best = self._row(last, "最佳距离")
+
+        info = self._card("账户与自启", right)
+        self.lbl_account = self._row(info, "账户")
+        self.lbl_autostart = self._row(info, "自启")
+        self.lbl_autostart.configure(text="登录时自动启动", fg=GREEN, font=FONT_B)
+        self.lbl_task = self._row(info, "计划任务")
+        self.lbl_task.configure(text="FaceUnlockAgent")
+        self.lbl_path = self._row(info, "安装目录")
+        self.lbl_path.configure(text=str(ROOT), font=("Consolas", 9))
+
+        tips = self._card("使用提示", right)
+        tk.Label(tips,
+                 text="锁屏后正对摄像头即可自动解锁。\n"
+                      "识别失败不影响密码 / PIN / 指纹登录。\n"
+                      "重新录入后新模板立即生效。\n"
+                      "切换摄像头后识别进程会自动重启。",
+                 bg=CARD, fg=MUTED, font=("Segoe UI", 9), anchor="nw",
+                 justify="left", wraplength=320).pack(fill="both", expand=True)
+
         self._load_camera_settings()
 
     def _load_camera_settings(self):
@@ -410,6 +462,15 @@ class Panel:
         self.lbl_worker_pid.configure(text=str(worker_pid) if worker_pid else "未运行")
         self.lbl_worker_mem.configure(text=f"{worker_mb:.1f} MB" if worker_mb else "—")
         self.lbl_total.configure(text=f"{total:.1f} MB")
+        started = state.get("started_at")
+        if started:
+            secs = max(0, int(time.time() - float(started)))
+            hh, rem = divmod(secs, 3600)
+            mm, ss = divmod(rem, 60)
+            self.lbl_uptime.configure(text=f"{hh:02d}:{mm:02d}:{ss:02d}")
+        else:
+            self.lbl_uptime.configure(text="—")
+        self.log_label.configure(text=tail_lines(ROOT / "logs" / "agent.log", 2) or "—")
         self._draw_bar(total / 500.0)
 
         tpl = read_json(TEMPLATE_PATH)
@@ -441,12 +502,14 @@ class Panel:
                 self.lbl_dist.configure(text=f"最佳 {best:.4f}")
             else:
                 self.lbl_dist.configure(text="—")
+            self.lbl_best.configure(text=f"{float(best):.4f}" if best is not None else "—")
             ts = last.get("time")
             self.lbl_last_time.configure(
                 text=datetime.fromtimestamp(ts).strftime("%m-%d %H:%M:%S") if ts else "—")
         else:
             self.lbl_result.configure(text="尚无记录", fg=MUTED, font=FONT)
             self.lbl_dist.configure(text="—")
+            self.lbl_best.configure(text="—")
             self.lbl_last_time.configure(text="—")
 
         self.root.after(1000, self.refresh)
@@ -464,7 +527,7 @@ def main() -> int:
     root = tk.Tk()
     root.title("人脸解锁 · 状态面板")
     root.configure(bg=BG)
-    root.geometry("480x1044")
+    root.geometry("1180x660")
     root.resizable(False, False)
     root.lift()
     root.after(150, root.focus_force)
